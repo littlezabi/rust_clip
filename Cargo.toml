@@ -1,0 +1,9 @@
+[package]
+name = "rust_clip"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clipboard-rs = "0.3.5"
+rusqlite = "0.40.1"
+tauri-plugin-global-shortcut = "2.3.2"
