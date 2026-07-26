@@ -103,8 +103,6 @@ impl eframe::App for ClipboardApp {
                 // Inside your UI update loop:
                 self.render_header(ui, ctx);
 
-                ui.separator();
-
                 crate::ui::components::render_history_list(
                     ui,
                     &self.history,
@@ -118,7 +116,8 @@ impl eframe::App for ClipboardApp {
                         }
                     },
                 );
-
+                
+                ui.separator();
                 // egui::ScrollArea::vertical().show(ui, |ui| {
                 //     for item in &self.history {
                 //         ui.group(|ui| {
