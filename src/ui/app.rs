@@ -1,4 +1,3 @@
-
 use crate::models::ClipboardItem;
 use eframe::egui;
 use std::sync::mpsc::Receiver;
@@ -10,6 +9,24 @@ pub struct ClipboardApp {
 }
 
 impl ClipboardApp {
+    fn get_app_frame() -> egui::Frame {
+        let panel_fill = egui::Color32::from_rgba_premultiplied(0, 0, 0, 240);
+
+        // Define a smooth drop shadow
+        let custom_shadow = egui::Shadow {
+            offset: [0, 4],
+            blur: 20,
+            spread: 2,
+            color: egui::Color32::from_black_alpha(120), // Transparency of the shadow
+        };
+
+        egui::Frame::new()
+            .fill(panel_fill)
+            .corner_radius(12.0)
+            .shadow(custom_shadow)
+            .inner_margin(6.0)
+    }
+
     pub fn new(rx: Receiver<ClipboardItem>) -> Self {
         Self {
             rx,
@@ -36,7 +53,7 @@ impl ClipboardApp {
             Box::new(move |_cc| Ok(Box::new(Self::new(rx)))),
         )
     }
-    
+
     fn render_header(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         let header_rect = ui.allocate_space(egui::vec2(ui.available_width(), 35.0)).1;
         let header_response = ui.interact(
@@ -69,26 +86,19 @@ impl ClipboardApp {
 }
 
 impl eframe::App for ClipboardApp {
-
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
         egui::Rgba::TRANSPARENT.to_array()
     }
-    
+
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Drain all items currently in the channel buffer instantly
         while let Ok(item) = self.rx.try_recv() {
             self.history.insert(0, item);
         }
-
-        // NOTE: No `request_repaint_after` loop!
-        // egui naturally sleeps right here until user interaction (mouse/keyboard)
-        // or a manual `ctx.request_repaint()` call wakes it up.
-
-        // Semi-transparent dark frosted color (R, G, B, Alpha)
-        let panel_fill = egui::Color32::from_rgba_premultiplied(20, 20, 20, 210);
-
+        // app_frame configuration in get_app_frame where window design is exists.
+        let app_frame = Self::get_app_frame();
         egui::CentralPanel::default()
-            .frame(egui::Frame::new().fill(panel_fill).corner_radius(10.0))
+            .frame(app_frame)
             .show(ctx, |ui| {
                 // Inside your UI update loop:
                 self.render_header(ui, ctx);
