@@ -76,7 +76,6 @@ fn render_clipboard_card(ui: &mut egui::Ui, item: &ClipboardItem, index: usize) 
 
 fn render_text_clipboard_item(ui: &mut egui::Ui, text: &str, index: usize) {
     ui.horizontal(|ui| {
-        ui.label("📄");
         
         let max_char = 117;
         let is_truncated = text.trim().chars().count() > max_char;

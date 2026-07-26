@@ -56,6 +56,7 @@ impl ClipboardApp {
 
     fn render_header(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         let header_rect = ui.allocate_space(egui::vec2(ui.available_width(), 35.0)).1;
+        
         let header_response = ui.interact(
             header_rect,
             ui.id().with("drag_handle"),
@@ -73,15 +74,35 @@ impl ClipboardApp {
             egui::FontId::proportional(16.0),
             egui::Color32::WHITE,
         );
+        // Position the "×" button at the top-right of header_rect
+          let close_btn_rect = egui::Rect::from_min_size(
+              header_rect.right_top() + egui::vec2(-32.0, 5.0),
+              egui::vec2(24.0, 24.0),
+          );
+          let close_response = ui.put(
+              close_btn_rect,
+              egui::Button::new(
+                  egui::RichText::new("×")
+                      .size(20.0)
+                      .color(egui::Color32::GRAY),
+              )
+              .frame(false),
+          );
+          // Hover & click handlers for close button
+          if close_response.hovered() {
+              ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+          }
+          if close_response.clicked() {
+              ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+          }
+          ui.add_space(4.0);
 
-        ui.add_space(4.0);
 
         ui.horizontal(|ui| {
             ui.label("🔍");
             ui.text_edit_singleline(&mut self.search_query);
         });
-
-        ui.separator();
+        ui.add_space(28.0);
     }
 }
 
@@ -100,6 +121,7 @@ impl eframe::App for ClipboardApp {
         egui::CentralPanel::default()
             .frame(app_frame)
             .show(ctx, |ui| {
+                
                 // Inside your UI update loop:
                 self.render_header(ui, ctx);
 
@@ -117,27 +139,6 @@ impl eframe::App for ClipboardApp {
                     },
                 );
                 
-                ui.separator();
-                // egui::ScrollArea::vertical().show(ui, |ui| {
-                //     for item in &self.history {
-                //         ui.group(|ui| {
-                //             ui.set_width(ui.available_width());
-                //             match item {
-                //                 ClipboardItem::Text(text) => {
-                //                     // let preview = if text.len() > 80 { &text[..80] } else { text };
-                //                     // ui.label(preview);
-                //                 }
-                //                 ClipboardItem::Image { mime, data } => {
-                //                     ui.label(format!("🖼️ Image [{}] ({} bytes)", mime, data.len()));
-                //                 }
-                //                 ClipboardItem::Files(paths) => {
-                //                     ui.label(format!("📁 Files ({} items)", paths.len()));
-                //                 }
-                //             }
-                //         });
-                //         ui.add_space(4.0);
-                //     }
-                // });
             });
     }
 }
