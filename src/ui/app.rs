@@ -105,26 +105,40 @@ impl eframe::App for ClipboardApp {
 
                 ui.separator();
 
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    for item in &self.history {
-                        ui.group(|ui| {
-                            ui.set_width(ui.available_width());
-                            match item {
-                                ClipboardItem::Text(text) => {
-                                    let preview = if text.len() > 80 { &text[..80] } else { text };
-                                    ui.label(preview);
-                                }
-                                ClipboardItem::Image { mime, data } => {
-                                    ui.label(format!("🖼️ Image [{}] ({} bytes)", mime, data.len()));
-                                }
-                                ClipboardItem::Files(paths) => {
-                                    ui.label(format!("📁 Files ({} items)", paths.len()));
-                                }
+                crate::ui::components::render_history_list(
+                    ui,
+                    &self.history,
+                    &mut |clicked_item| {
+                        match clicked_item {
+                            ClipboardItem::Text(text) => {
+                                println!("Item clicked, ready to copy back: {}", text);
+                                // TODO: Add your logic here to re-send text to system clipboard
                             }
-                        });
-                        ui.add_space(4.0);
-                    }
-                });
+                            _ => {}
+                        }
+                    },
+                );
+
+                // egui::ScrollArea::vertical().show(ui, |ui| {
+                //     for item in &self.history {
+                //         ui.group(|ui| {
+                //             ui.set_width(ui.available_width());
+                //             match item {
+                //                 ClipboardItem::Text(text) => {
+                //                     // let preview = if text.len() > 80 { &text[..80] } else { text };
+                //                     // ui.label(preview);
+                //                 }
+                //                 ClipboardItem::Image { mime, data } => {
+                //                     ui.label(format!("🖼️ Image [{}] ({} bytes)", mime, data.len()));
+                //                 }
+                //                 ClipboardItem::Files(paths) => {
+                //                     ui.label(format!("📁 Files ({} items)", paths.len()));
+                //                 }
+                //             }
+                //         });
+                //         ui.add_space(4.0);
+                //     }
+                // });
             });
     }
 }
