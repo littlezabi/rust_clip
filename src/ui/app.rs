@@ -1,0 +1,120 @@
+
+use crate::models::ClipboardItem;
+use eframe::egui;
+use std::sync::mpsc::Receiver;
+
+pub struct ClipboardApp {
+    rx: Receiver<ClipboardItem>,
+    history: Vec<ClipboardItem>,
+    search_query: String,
+}
+
+impl ClipboardApp {
+    pub fn new(rx: Receiver<ClipboardItem>) -> Self {
+        Self {
+            rx,
+            history: Vec::new(),
+            search_query: String::new(),
+        }
+    }
+
+    pub fn run(rx: Receiver<ClipboardItem>) -> Result<(), eframe::Error> {
+        let options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default()
+                .with_inner_size([380.0, 550.0])
+                .with_min_inner_size([380.0, 550.0])
+                .with_max_inner_size([380.0, 550.0])
+                .with_decorations(false)
+                .with_transparent(true)
+                .with_window_level(egui::WindowLevel::AlwaysOnTop),
+            ..Default::default()
+        };
+
+        eframe::run_native(
+            "RustClip",
+            options,
+            Box::new(move |_cc| Ok(Box::new(Self::new(rx)))),
+        )
+    }
+    
+    fn render_header(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        let header_rect = ui.allocate_space(egui::vec2(ui.available_width(), 35.0)).1;
+        let header_response = ui.interact(
+            header_rect,
+            ui.id().with("drag_handle"),
+            egui::Sense::drag(),
+        );
+
+        if header_response.dragged() {
+            ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag);
+        }
+
+        ui.painter().text(
+            header_rect.left_top() + egui::vec2(12.0, 8.0),
+            egui::Align2::LEFT_TOP,
+            "📋 RustClip",
+            egui::FontId::proportional(16.0),
+            egui::Color32::WHITE,
+        );
+
+        ui.add_space(4.0);
+
+        ui.horizontal(|ui| {
+            ui.label("🔍");
+            ui.text_edit_singleline(&mut self.search_query);
+        });
+
+        ui.separator();
+    }
+}
+
+impl eframe::App for ClipboardApp {
+
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        egui::Rgba::TRANSPARENT.to_array()
+    }
+    
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Drain all items currently in the channel buffer instantly
+        while let Ok(item) = self.rx.try_recv() {
+            self.history.insert(0, item);
+        }
+
+        // NOTE: No `request_repaint_after` loop!
+        // egui naturally sleeps right here until user interaction (mouse/keyboard)
+        // or a manual `ctx.request_repaint()` call wakes it up.
+
+        // Semi-transparent dark frosted color (R, G, B, Alpha)
+        let panel_fill = egui::Color32::from_rgba_premultiplied(20, 20, 20, 210);
+
+        egui::CentralPanel::default()
+            .frame(egui::Frame::new().fill(panel_fill).corner_radius(10.0))
+            .show(ctx, |ui| {
+                // Inside your UI update loop:
+                self.render_header(ui, ctx);
+
+                ui.separator();
+
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    for item in &self.history {
+                        ui.group(|ui| {
+                            ui.set_width(ui.available_width());
+                            match item {
+                                ClipboardItem::Text(text) => {
+                                    let preview = if text.len() > 80 { &text[..80] } else { text };
+                                    ui.label(preview);
+                                }
+                                ClipboardItem::Image { mime, data } => {
+                                    ui.label(format!("🖼️ Image [{}] ({} bytes)", mime, data.len()));
+                                }
+                                ClipboardItem::Files(paths) => {
+                                    ui.label(format!("📁 Files ({} items)", paths.len()));
+                                }
+                            }
+                        });
+                        ui.add_space(4.0);
+                    }
+                });
+            });
+    }
+}
