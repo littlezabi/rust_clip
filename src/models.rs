@@ -1,4 +1,8 @@
-pub enum ClipboardContent{
+use std::path::PathBuf;
+
+#[derive(Clone)]
+pub enum ClipboardItem {
     Text(String),
-    Image(Vec<u8>) 
+    Image { mime: String, data: Vec<u8> },
+    Files(Vec<PathBuf>),
 }
