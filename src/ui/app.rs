@@ -56,7 +56,7 @@ impl ClipboardApp {
 
     fn render_header(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         let header_rect = ui.allocate_space(egui::vec2(ui.available_width(), 35.0)).1;
-        
+
         let header_response = ui.interact(
             header_rect,
             ui.id().with("drag_handle"),
@@ -74,29 +74,40 @@ impl ClipboardApp {
             egui::FontId::proportional(16.0),
             egui::Color32::WHITE,
         );
-        // Position the "×" button at the top-right of header_rect
-          let close_btn_rect = egui::Rect::from_min_size(
-              header_rect.right_top() + egui::vec2(-32.0, 5.0),
-              egui::vec2(24.0, 24.0),
-          );
-          let close_response = ui.put(
-              close_btn_rect,
-              egui::Button::new(
-                  egui::RichText::new("×")
-                      .size(20.0)
-                      .color(egui::Color32::GRAY),
-              )
-              .frame(false),
-          );
-          // Hover & click handlers for close button
-          if close_response.hovered() {
-              ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
-          }
-          if close_response.clicked() {
-              ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-          }
-          ui.add_space(4.0);
 
+        // Cross ("✕") Button Position (Right)
+        let cross_pos = header_rect.right_top() + egui::vec2(-16.0, 16.0);
+
+        let cross_response = ui.interact(
+            egui::Rect::from_center_size(cross_pos, egui::vec2(24.0, 24.0)),
+            ui.id().with("cross_close"),
+            egui::Sense::click(),
+        );
+
+        let is_hovered = cross_response.hovered();
+        let how_hovered = ui.ctx().animate_bool(ui.id().with("cross_anim"), is_hovered);
+
+        // Color transition: Light White -> Full Bright White on hover
+        let icon_color = egui::Color32::from_gray(180).lerp_to_gamma(
+            egui::Color32::WHITE,
+            how_hovered,
+        );
+
+        ui.painter().text(
+            cross_pos,
+            egui::Align2::CENTER_CENTER,
+            "×",
+            egui::FontId::proportional(20.0),
+            icon_color,
+        );
+
+        if is_hovered {
+            ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+
+        if cross_response.clicked() {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
 
         ui.horizontal(|ui| {
             ui.label("🔍");
