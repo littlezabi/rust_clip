@@ -10,4 +10,6 @@ eframe = "0.31"
 egui = "0.31"
 image = { version = "0.25", features = ["png", "jpeg"] }
 tray-icon = "0.19"
+gtk = "0.18"
+ksni = "0.2"
 

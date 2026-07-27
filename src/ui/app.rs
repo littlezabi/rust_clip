@@ -2,10 +2,66 @@ use crate::models::ClipboardItem;
 use eframe::egui;
 use std::sync::mpsc::Receiver;
 
+use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
+
 pub struct ClipboardApp {
     rx: Receiver<ClipboardItem>,
     history: Vec<ClipboardItem>,
     search_query: String,
+    _tray_icon: Option<TrayIcon>,
+}
+
+fn create_raw_icon() -> Option<(Vec<u8>, u32, u32)> {
+    let width = 32;
+    let height = 32;
+    let mut rgba = Vec::with_capacity((width * height * 4) as usize);
+
+    for y in 0..height {
+        for x in 0..width {
+            let is_body = x >= 6 && x < 26 && y >= 8 && y < 28;
+            let is_clip = x >= 11 && x < 21 && y >= 4 && y < 10;
+
+            if is_clip {
+                rgba.extend_from_slice(&[220, 220, 220, 255]);
+            } else if is_body {
+                rgba.extend_from_slice(&[70, 130, 220, 255]);
+            } else {
+                rgba.extend_from_slice(&[0, 0, 0, 0]);
+            }
+        }
+    }
+
+    Some((rgba, width, height))
+}
+
+#[cfg(target_os = "linux")]
+struct LinuxTray;
+
+#[cfg(target_os = "linux")]
+impl ksni::Tray for LinuxTray {
+    fn icon_name(&self) -> String {
+        "edit-paste".to_string()
+    }
+
+    fn title(&self) -> String {
+        "RustClip".to_string()
+    }
+
+    fn id(&self) -> String {
+        "rust_clip".to_string()
+    }
+
+    fn icon_pixmap(&self) -> Vec<ksni::Icon> {
+        if let Some((rgba, width, height)) = create_raw_icon() {
+            vec![ksni::Icon {
+                width: width as i32,
+                height: height as i32,
+                data: rgba,
+            }]
+        } else {
+            Vec::new()
+        }
+    }
 }
 
 impl ClipboardApp {
@@ -28,22 +84,51 @@ impl ClipboardApp {
     }
 
     pub fn new(rx: Receiver<ClipboardItem>) -> Self {
+        let _tray_icon = create_raw_icon().and_then(|(rgba, width, height)| {
+            let icon = Icon::from_rgba(rgba, width, height).ok()?;
+            TrayIconBuilder::new()
+                .with_tooltip("RustClip Clipboard Manager")
+                .with_icon(icon)
+                .build()
+                .ok()
+        });
+
         Self {
             rx,
             history: Vec::new(),
             search_query: String::new(),
+            _tray_icon,
         }
     }
 
     pub fn run(rx: Receiver<ClipboardItem>) -> Result<(), eframe::Error> {
+        #[cfg(target_os = "linux")]
+        {
+            let service = ksni::TrayService::new(LinuxTray);
+            let _ = service.spawn();
+        }
+
+        let icon_data = create_raw_icon();
+
+        let mut viewport = egui::ViewportBuilder::default()
+            .with_app_id("rust_clip")
+            .with_inner_size([380.0, 550.0])
+            .with_min_inner_size([380.0, 550.0])
+            .with_max_inner_size([380.0, 550.0])
+            .with_decorations(false)
+            .with_transparent(true)
+            .with_window_level(egui::WindowLevel::AlwaysOnTop);
+
+        if let Some((rgba, width, height)) = icon_data {
+            viewport = viewport.with_icon(egui::IconData {
+                rgba,
+                width,
+                height,
+            });
+        }
+
         let options = eframe::NativeOptions {
-            viewport: egui::ViewportBuilder::default()
-                .with_inner_size([380.0, 550.0])
-                .with_min_inner_size([380.0, 550.0])
-                .with_max_inner_size([380.0, 550.0])
-                .with_decorations(false)
-                .with_transparent(true)
-                .with_window_level(egui::WindowLevel::AlwaysOnTop),
+            viewport,
             ..Default::default()
         };
 
@@ -212,6 +297,13 @@ impl eframe::App for ClipboardApp {
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Handle tray icon click events
+        if let Ok(event) = tray_icon::TrayIconEvent::receiver().try_recv() {
+            if let tray_icon::TrayIconEvent::Click { .. } = event {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+            }
+        }
+
         // Drain all items currently in the channel buffer instantly
         while let Ok(item) = self.rx.try_recv() {
             self.history.insert(0, item);
