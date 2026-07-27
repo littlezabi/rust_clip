@@ -54,6 +54,51 @@ impl ClipboardApp {
         )
     }
 
+    fn render_title_and_clear_button(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
+        let header_rect = ui.allocate_space(egui::vec2(ui.available_width(), 35.0)).1;
+        ui.painter().text(
+            header_rect.left_top() + egui::vec2(12.0, 8.0),
+            egui::Align2::LEFT_TOP,
+            "Clipboard",
+            egui::FontId::proportional(16.0),
+            egui::Color32::WHITE,
+        );
+
+        let clear_btn = header_rect.right_top() + egui::vec2(-35.0, 12.0);
+
+        let clear_response = ui.interact(
+            egui::Rect::from_center_size(clear_btn, egui::vec2(24.0, 24.0)),
+            ui.id().with("clear_button"),
+            egui::Sense::click(),
+        );
+
+        let is_hovered = clear_response.hovered();
+        let how_hovered = ui.ctx().animate_bool(ui.id().with("clear_anim"), is_hovered);
+
+        // Color transition: Light White -> Full Bright White on hover
+        let clear_text_color = egui::Color32::from_gray(180).lerp_to_gamma(
+            egui::Color32::WHITE,
+            how_hovered,
+        );
+
+        ui.painter().text(
+            clear_btn,
+            egui::Align2::CENTER_CENTER,
+            "Clear all",
+            egui::FontId::proportional(14.0),
+            clear_text_color,
+        );
+
+        if is_hovered {
+            ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+
+        if clear_response.clicked() {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+        ui.add_space(28.0);
+    }
+
     fn render_header(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         let header_rect = ui.allocate_space(egui::vec2(ui.available_width(), 35.0)).1;
 
@@ -76,7 +121,7 @@ impl ClipboardApp {
         );
 
         // Cross ("✕") Button Position (Right)
-        let cross_pos = header_rect.right_top() + egui::vec2(-16.0, 16.0);
+        let cross_pos = header_rect.right_top() + egui::vec2(-16.0, 12.0);
 
         let cross_response = ui.interact(
             egui::Rect::from_center_size(cross_pos, egui::vec2(24.0, 24.0)),
@@ -108,12 +153,15 @@ impl ClipboardApp {
         if cross_response.clicked() {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
-
+    }
+    
+    fn render_search(&mut self, ui: &mut egui::Ui, ctx: &egui::Context){
+        
         ui.horizontal(|ui| {
             ui.label("🔍");
             ui.text_edit_singleline(&mut self.search_query);
         });
-        ui.add_space(28.0);
+        
     }
 }
 
@@ -135,6 +183,10 @@ impl eframe::App for ClipboardApp {
                 
                 // Inside your UI update loop:
                 self.render_header(ui, ctx);
+                self.render_search(ui, ctx);
+                ui.add_space(20.0);
+                self.render_title_and_clear_button(ui, ctx);
+                
 
                 crate::ui::components::render_history_list(
                     ui,
