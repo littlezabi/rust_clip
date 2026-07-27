@@ -20,26 +20,62 @@ pub fn render_history_list(
 }
 
 fn render_clipboard_card(ui: &mut egui::Ui, item: &ClipboardItem, index: usize) -> egui::Response {
-    let response = ui.group(|ui| {
-        ui.set_width(ui.available_width());
+    let card_id = ui.make_persistent_id(format!("clipboard_card_{}", index));
 
-        match item {
-            ClipboardItem::Text(text) => render_text_clip_item(ui, text, index),
-            ClipboardItem::Image { mime, data } => {
-                ui.label(format!("🖼️ Image [{}] ({} bytes)", mime, data.len()));
-            }
-            ClipboardItem::Files(paths) => {
-                ui.label(format!("📁 Files ({} items)", paths.len()));
-            }
-        }
-    });
+    let is_hovered = ui
+        .ctx()
+        .read_response(card_id)
+        .map_or(false, |r| r.hovered());
+    let how_hovered = ui.ctx().animate_bool(card_id, is_hovered);
 
-    response.response
+    // 1. Background: Dark -> Subtle White tint on hover
+    let bg_color = egui::Color32::from_gray(24).lerp_to_gamma(
+        egui::Color32::from_rgba_unmultiplied(255, 255, 255, 5),
+        how_hovered,
+    );
+
+    // 2. Border: Dark gray -> Bright White on hover
+    let border_color = egui::Color32::from_gray(40).lerp_to_gamma(
+        egui::Color32::from_gray(80),
+        how_hovered,
+    );
+
+    let frame = egui::Frame::group(ui.style())
+        .fill(bg_color)
+        .stroke(egui::Stroke::new(1.0, border_color))
+        .corner_radius(6.0)
+        .inner_margin(8.0);
+
+    let response = frame
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+
+            match item {
+                ClipboardItem::Text(text) => {
+                    render_text_clipboard_item(ui, text, index);
+                }
+                ClipboardItem::Image { mime, data } => {
+                    ui.label(format!("🖼️ Image [{}] ({} bytes)", mime, data.len()));
+                }
+                ClipboardItem::Files(paths) => {
+                    ui.label(format!("📁 Files ({} items)", paths.len()));
+                }
+            }
+        })
+        .response;
+
+    // Register card_id with the exact bounding rect of the card
+    let response = ui.interact(response.rect, card_id, egui::Sense::click());
+
+    if response.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+
+    response
 }
 
-fn render_text_clip_item(ui: &mut egui::Ui, text: &str, index: usize) {
+fn render_text_clipboard_item(ui: &mut egui::Ui, text: &str, index: usize) {
     ui.horizontal(|ui| {
-        ui.label("📄");
         
         let max_char = 117;
         let is_truncated = text.trim().chars().count() > max_char;

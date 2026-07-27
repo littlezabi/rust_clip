@@ -56,6 +56,7 @@ impl ClipboardApp {
 
     fn render_header(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
         let header_rect = ui.allocate_space(egui::vec2(ui.available_width(), 35.0)).1;
+
         let header_response = ui.interact(
             header_rect,
             ui.id().with("drag_handle"),
@@ -74,14 +75,45 @@ impl ClipboardApp {
             egui::Color32::WHITE,
         );
 
-        ui.add_space(4.0);
+        // Cross ("✕") Button Position (Right)
+        let cross_pos = header_rect.right_top() + egui::vec2(-16.0, 16.0);
+
+        let cross_response = ui.interact(
+            egui::Rect::from_center_size(cross_pos, egui::vec2(24.0, 24.0)),
+            ui.id().with("cross_close"),
+            egui::Sense::click(),
+        );
+
+        let is_hovered = cross_response.hovered();
+        let how_hovered = ui.ctx().animate_bool(ui.id().with("cross_anim"), is_hovered);
+
+        // Color transition: Light White -> Full Bright White on hover
+        let icon_color = egui::Color32::from_gray(180).lerp_to_gamma(
+            egui::Color32::WHITE,
+            how_hovered,
+        );
+
+        ui.painter().text(
+            cross_pos,
+            egui::Align2::CENTER_CENTER,
+            "×",
+            egui::FontId::proportional(20.0),
+            icon_color,
+        );
+
+        if is_hovered {
+            ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+
+        if cross_response.clicked() {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
 
         ui.horizontal(|ui| {
             ui.label("🔍");
             ui.text_edit_singleline(&mut self.search_query);
         });
-
-        ui.separator();
+        ui.add_space(28.0);
     }
 }
 
@@ -100,10 +132,9 @@ impl eframe::App for ClipboardApp {
         egui::CentralPanel::default()
             .frame(app_frame)
             .show(ctx, |ui| {
+                
                 // Inside your UI update loop:
                 self.render_header(ui, ctx);
-
-                ui.separator();
 
                 crate::ui::components::render_history_list(
                     ui,
@@ -118,27 +149,7 @@ impl eframe::App for ClipboardApp {
                         }
                     },
                 );
-
-                // egui::ScrollArea::vertical().show(ui, |ui| {
-                //     for item in &self.history {
-                //         ui.group(|ui| {
-                //             ui.set_width(ui.available_width());
-                //             match item {
-                //                 ClipboardItem::Text(text) => {
-                //                     // let preview = if text.len() > 80 { &text[..80] } else { text };
-                //                     // ui.label(preview);
-                //                 }
-                //                 ClipboardItem::Image { mime, data } => {
-                //                     ui.label(format!("🖼️ Image [{}] ({} bytes)", mime, data.len()));
-                //                 }
-                //                 ClipboardItem::Files(paths) => {
-                //                     ui.label(format!("📁 Files ({} items)", paths.len()));
-                //                 }
-                //             }
-                //         });
-                //         ui.add_space(4.0);
-                //     }
-                // });
+                
             });
     }
 }
