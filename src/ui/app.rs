@@ -24,7 +24,7 @@ impl ClipboardApp {
             .fill(panel_fill)
             .corner_radius(12.0)
             .shadow(custom_shadow)
-            .inner_margin(6.0)
+            .inner_margin(12.0)
     }
 
     pub fn new(rx: Receiver<ClipboardItem>) -> Self {
@@ -96,7 +96,7 @@ impl ClipboardApp {
         if clear_response.clicked() {
             self.history.clear();
         }
-        ui.add_space(28.0);
+        ui.add_space(6.0);
     }
 
     fn render_header(&mut self, ui: &mut egui::Ui, ctx: &egui::Context) {
@@ -155,13 +155,54 @@ impl ClipboardApp {
         }
     }
     
-    fn render_search(&mut self, ui: &mut egui::Ui, ctx: &egui::Context){
-        
-        ui.horizontal(|ui| {
-            ui.label("🔍");
-            ui.text_edit_singleline(&mut self.search_query);
+    fn render_search(&mut self, ui: &mut egui::Ui, _ctx: &egui::Context) {
+        let frame = egui::Frame::group(ui.style())
+            .fill(egui::Color32::from_gray(28))
+            .stroke(egui::Stroke::new(1.0, egui::Color32::from_gray(48)))
+            .corner_radius(8.0)
+            .inner_margin(egui::Margin::symmetric(10, 6));
+
+        frame.show(ui, |ui| {
+            ui.set_width(ui.available_width());
+
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("🔍").color(egui::Color32::GRAY));
+
+                let has_text = !self.search_query.is_empty();
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    // Always render the clear button in the exact same layout tree to keep TextEdit ID stable
+                    let clear_btn = ui.add(
+                        egui::Button::new(
+                            egui::RichText::new("×")
+                                .size(16.0)
+                                .color(if has_text {
+                                    egui::Color32::GRAY
+                                } else {
+                                    egui::Color32::TRANSPARENT // Opacity 0 / hidden when empty
+                                }),
+                        )
+                        .frame(false),
+                    );
+
+                    if has_text && clear_btn.hovered() {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                    }
+
+                    if has_text && clear_btn.clicked() {
+                        self.search_query.clear();
+                    }
+
+                    // TextEdit remains in a single stable layout tree -> NEVER loses focus
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.search_query)
+                            .hint_text(egui::RichText::new("Search history...").color(egui::Color32::from_gray(120)))
+                            .frame(false)
+                            .desired_width(ui.available_width()),
+                    );
+                });
+            });
         });
-        
     }
 }
 
@@ -175,33 +216,66 @@ impl eframe::App for ClipboardApp {
         while let Ok(item) = self.rx.try_recv() {
             self.history.insert(0, item);
         }
-        // app_frame configuration in get_app_frame where window design is exists.
+
         let app_frame = Self::get_app_frame();
         egui::CentralPanel::default()
             .frame(app_frame)
             .show(ctx, |ui| {
-                
-                // Inside your UI update loop:
                 self.render_header(ui, ctx);
+                ui.add_space(8.0);
                 self.render_search(ui, ctx);
-                ui.add_space(20.0);
+                ui.add_space(8.0);
                 self.render_title_and_clear_button(ui, ctx);
-                
+                ui.add_space(6.0);
 
-                crate::ui::components::render_history_list(
-                    ui,
-                    &self.history,
-                    &mut |clicked_item| {
-                        match clicked_item {
-                            ClipboardItem::Text(text) => {
-                                println!("Item clicked, ready to copy back: {}", text);
-                                // TODO: Add your logic here to re-send text to system clipboard
+                // Filter history based on search query
+                let filtered_history: Vec<ClipboardItem> = if self.search_query.trim().is_empty() {
+                    self.history.clone()
+                } else {
+                    let query = self.search_query.trim().to_lowercase();
+                    self.history
+                        .iter()
+                        .filter(|item| match item {
+                            ClipboardItem::Text(text) => text.to_lowercase().contains(&query),
+                            ClipboardItem::Image { mime, .. } => {
+                                mime.to_lowercase().contains(&query) || "image".contains(&query)
                             }
-                            _ => {}
-                        }
-                    },
-                );
-                
+                            ClipboardItem::Files(paths) => {
+                                paths
+                                    .iter()
+                                    .any(|p| p.to_string_lossy().to_lowercase().contains(&query))
+                                    || "file".contains(&query)
+                                    || "files".contains(&query)
+                            }
+                        })
+                        .cloned()
+                        .collect()
+                };
+
+                if filtered_history.is_empty() && !self.search_query.trim().is_empty() {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(20.0);
+                        ui.label(
+                            egui::RichText::new(format!("No matches found for \"{}\"", self.search_query.trim()))
+                                .color(egui::Color32::GRAY)
+                                .italics(),
+                        );
+                    });
+                } else {
+                    crate::ui::components::render_history_list(
+                        ui,
+                        &filtered_history,
+                        &mut |clicked_item| {
+                            match clicked_item {
+                                ClipboardItem::Text(text) => {
+                                    println!("Item clicked, ready to copy back: {}", text);
+                                    // TODO: Add logic to re-send text to system clipboard
+                                }
+                                _ => {}
+                            }
+                        },
+                    );
+                }
             });
     }
 }
