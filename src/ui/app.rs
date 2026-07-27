@@ -94,7 +94,7 @@ impl ClipboardApp {
         }
 
         if clear_response.clicked() {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            self.history.clear();
         }
         ui.add_space(28.0);
     }
